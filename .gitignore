@@ -52,3 +52,6 @@ CATKIN_IGNORE
 
 # Alan's ignores:
 *.log
+turtlebot4_ws/*
+install/*
+log/*
