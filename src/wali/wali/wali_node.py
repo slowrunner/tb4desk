@@ -36,6 +36,15 @@
       float32 design_capacity  # Capacity in Ah (design capacity)  (If unmeasured NaN)
       float32 percentage       # Charge percentage on 0 to 1 range  (If unmeasured NaN)
       ... and more
+    - irobot_create_msgs/action/Undock
+      # Request
+      ---
+      # Result
+      bool is_docked
+      ---
+      # Feedback
+
+
 
 """
 
@@ -44,13 +53,16 @@ import math
 from rclpy.node import Node
 from rclpy.executors import ExternalShutdownException
 from rclpy.qos import qos_profile_sensor_data
+from rclpy.action import ActionClient
+from rclpy.time import Time
+
+from sensor_msgs.msg import BatteryState       # percentage: 0.0 - 1.0
+from irobot_create_msgs.msg import Undock      # no parms, result: is_docked: true,false
+from irobot_create_msgs.msg import DockStatus  # docked: true,false
 
 import sys
-from sensor_msgs.msg import BatteryState       # (percentage: 0.0 - 1.0)
-# from y.msg import DockStatus                 # (docked: true,false)
 import logging
 import datetime as dt
-from rclpy.time import Time
 
 DEBUG = False
 LIFELOGFILE = "/home/ubuntu/tb4rpi/life.log"
@@ -67,7 +79,7 @@ class WaLINode(Node):
     self.lifeLog.setLevel(logging.INFO)
 
     self.loghandler = logging.FileHandler(LIFELOGFILE)
-    self.logformatter = logging.Formatter('%(asctime)s|%(filename)s.%(funcName)s %(message)s',"%Y-%m-%d %H:%M")
+    self.logformatter = logging.Formatter('%(asctime)s|%(filename)s: %(message)s',"%Y-%m-%d %H:%M")
     self.loghandler.setFormatter(self.logformatter)
     self.lifeLog.addHandler(self.loghandler)
 
@@ -83,10 +95,17 @@ class WaLINode(Node):
       # pick one from following- explicit or named profile
       # QoSProfile(depth=10, reliability=ReliabilityPolicy.BEST_EFFORT))
       qos_profile_sensor_data)  # best effort depth 10 sensor profile
+
     if DEBUG:
       printMsg = '\n*** /battery_state subscriber created'
+      print(printMsg)
 
     self.battery_state = None
+
+    self._undock_action_client = ActionClient(self, Undock, 'undock')
+
+
+
 
 
   def battery_state_sub_callback(self,battery_state_msg):
@@ -95,6 +114,33 @@ class WaLINode(Node):
       printMsg = "battery_state.percentage {:.0f} %".format(100 * self.battery_state.percentage)
       print(printMsg)
       # self.lifeLog.info(printMsg)
+
+  def undock_action_send_goal(self):
+    undock_msg = Undock.Goal()
+    self._undock_action_client.wait_for_server()
+    self._undock_action_send_goal_future = self._undock_action_client.send_goal_async(undock_msg)
+    self._undock_action_send_goal_future.add_done_callback(self.undock_goal_responce_callback)
+
+  def undock_goal_response_callback(self, future):
+    goal_handle = future.result()
+    if not goal_handle.accepted:
+      self.get_logger().info('Undock Goal Rejected :(')
+      return
+
+    self.get_logger().info('Undock Goal Accepted :)')
+
+    self._get_undock_result_future = goal_handle.get_result_async()
+    self._get_undock_result_future.add_done_callback(self.get_undock_result_callback)
+
+  def get_undock_result_callback(self, future):
+    result = future.result().result
+    self.get_logger().info('Result: {0"'.format(result.is_docked))
+
+
+
+
+
+
 
 def main():
   rclpy.init(args=None)
