@@ -4,7 +4,7 @@ package_name = 'wali'
 
 setup(
     name=package_name,
-    version='0.0.0',
+    version='0.0.1',
     packages=[package_name],
     data_files=[
         ('share/ament_index/resource_index/packages',
@@ -15,8 +15,8 @@ setup(
     zip_safe=True,
     maintainer='ubuntu',
     maintainer_email='slowrunner@users.noreply.github.com',
-    description='TODO: Package description',
-    license='TODO: License declaration',
+    description='WaLI: Wall follower Looking for Intelligence',
+    license='If it works for you, let me know',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [

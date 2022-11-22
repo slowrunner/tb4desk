@@ -57,7 +57,7 @@ from rclpy.action import ActionClient
 from rclpy.time import Time
 
 from sensor_msgs.msg import BatteryState       # percentage: 0.0 - 1.0
-from irobot_create_msgs.msg import Undock      # no parms, result: is_docked: true,false
+from irobot_create_msgs.action import Undock      # no parms, result: is_docked: true,false
 from irobot_create_msgs.msg import DockStatus  # docked: true,false
 
 import sys
@@ -79,7 +79,7 @@ class WaLINode(Node):
     self.lifeLog.setLevel(logging.INFO)
 
     self.loghandler = logging.FileHandler(LIFELOGFILE)
-    self.logformatter = logging.Formatter('%(asctime)s|%(filename)s: %(message)s',"%Y-%m-%d %H:%M")
+    self.logformatter = logging.Formatter('%(asctime)s|%(filename)s| %(message)s',"%Y-%m-%d %H:%M")
     self.loghandler.setFormatter(self.logformatter)
     self.lifeLog.addHandler(self.loghandler)
 
@@ -104,25 +104,38 @@ class WaLINode(Node):
 
     self._undock_action_client = ActionClient(self, Undock, 'undock')
 
-
-
+    period_for_timer = 60.0  # Once every 60 seconds
+    self.timer = self.create_timer( period_for_timer, self.wali_main_cb)  # call the wali_node's main loop when ROS timer triggers
+    if DEBUG: 
+        printMsg ='wali_node: created wali_main callback for once every {:.0f} seconds'.format(period_for_timer)
+        print(printMsg)
+    self.battery_percentage = -1
+    self.state = "init"
 
 
   def battery_state_sub_callback(self,battery_state_msg):
     self.battery_state = battery_state_msg
+    self.battery_percentage = self.battery_state.percentage
     if DEBUG:
-      printMsg = "battery_state.percentage {:.0f} %".format(100 * self.battery_state.percentage)
+      printMsg = "battery_state_sub_callback(): battery_state.percentage {:.0f} %".format(100 * self.battery_percentage)
       print(printMsg)
       # self.lifeLog.info(printMsg)
 
   def undock_action_send_goal(self):
     undock_msg = Undock.Goal()
+    if DEBUG:
+      printMsg = "undock_action_send_goal(): executing"
+      print(printMsg)
     self._undock_action_client.wait_for_server()
     self._undock_action_send_goal_future = self._undock_action_client.send_goal_async(undock_msg)
-    self._undock_action_send_goal_future.add_done_callback(self.undock_goal_responce_callback)
+    self._undock_action_send_goal_future.add_done_callback(self.undock_goal_response_callback)
 
   def undock_goal_response_callback(self, future):
     goal_handle = future.result()
+    if DEBUG:
+      printMsg = "undock_goal_response_callback(): Goal Accepted: {}".format(goal_handle.accepted)
+      print(printMsg)
+
     if not goal_handle.accepted:
       self.get_logger().info('Undock Goal Rejected :(')
       return
@@ -134,12 +147,38 @@ class WaLINode(Node):
 
   def get_undock_result_callback(self, future):
     result = future.result().result
-    self.get_logger().info('Result: {0"'.format(result.is_docked))
+    if DEBUG:
+      printMsg = "get_undock_result_callback(): Undock Result is_docked {} %".format(result.is_docked)
+      print(printMsg)
+    if result.is_docked:
+      self.state = "docked"
+    else:
+      self.state = "undocked"
+    self.get_logger().info('Result.is_docked: {0}'.format(result.is_docked))
 
 
+  def wali_main_cb(self):
+    try:
+      if DEBUG:
+        printMsg = "wali_main_cb(): executing"
+        print(printMsg)
+        printMsg = "wali_main_cb(): wali.state = {}".format(self.state)
+        print(printMsg)
 
+      # WaLI logic
+      # publishes /undock action goal when BatteryState.percentage = 1.0 (and state="docked")
+      # publishes /rotate_angle {angle: 1.57} (180deg) when BatteryState.percentage < 30%
+      # publishes /dock action goal when BatteryState.percentage < 0.25
 
-
+      # if (self.battery_percentage == 1.0):
+      if (self.battery_percentage > 0.5) and (self.state not in ["undocking","undocked"]):    # for testing
+        self.state = "undocking"
+        if DEBUG:
+          printMsg = "wali_main_cb(): battery_percentage {:.0} % sending undock action goal".format(self.battery_percentage)
+        self.undock_action_send_goal()
+    except Exception as e:
+        print("wali_main_cb(): Exception:",str(e))
+        sys.exit(1)
 
 
 def main():
