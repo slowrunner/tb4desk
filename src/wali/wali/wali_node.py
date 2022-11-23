@@ -128,6 +128,8 @@ class WaLINode(Node):
     self.battery_state = None
 
     self._undock_action_client = ActionClient(self, Undock, 'undock')
+    self._dock_action_client = ActionClient(self, Dock, 'dock')
+    self._rotate_angle_action_client = ActionClient(self, RotateAngle, 'rotate_angle')
 
     period_for_timer = 60.0  # Once every 60 seconds
     self.timer = self.create_timer( period_for_timer, self.wali_main_cb)  # call the wali_node's main loop when ROS timer triggers
@@ -189,7 +191,7 @@ class WaLINode(Node):
 
 
   def dock_action_send_goal(self):
-    dock_msg = dock.Goal()
+    dock_msg = Dock.Goal()
     if DEBUG:
       printMsg = "dock_action_send_goal(): executing"
       print(printMsg)
@@ -229,19 +231,21 @@ class WaLINode(Node):
 
 
 
-  def rotate_action_send_goal(self):
-    rotate_msg = rotate.Goal()
-    if DEBUG:
-      printMsg = "rotate_action_send_goal(): executing"
-      print(printMsg)
-    self._rotate_action_client.wait_for_server()
-    self._rotate_action_send_goal_future = self._rotate_action_client.send_goal_async(rotate_msg)
-    self._rotate_action_send_goal_future.add_done_callback(self.rotate_goal_response_callback)
+  def rotate_angle_action_send_goal(self,angle):
+    rotate_angle_msg = RotateAngle.Goal()
+    rotate_angle_msg.angle = angle
 
-  def rotate_goal_response_callback(self, future):
+    if DEBUG:
+      printMsg = "rotate_angle_action_send_goal(rotate_angle_msg.angle={:.3f}): executing".format(rotate_angle_msg.angle)
+      print(printMsg)
+    self._rotate_angle_action_client.wait_for_server()
+    self._rotate_angle_action_send_goal_future = self._rotate_angle_action_client.send_goal_async(rotate_angle_msg)
+    self._rotate_angle_action_send_goal_future.add_done_callback(self.rotate_angle_goal_response_callback)
+
+  def rotate_angle_goal_response_callback(self, future):
     goal_handle = future.result()
     if DEBUG:
-      printMsg = "rotate_goal_response_callback(): Goal Accepted: {}".format(goal_handle.accepted)
+      printMsg = "rotate_angle_goal_response_callback(): Goal Accepted: {}".format(goal_handle.accepted)
       print(printMsg)
 
     if not goal_handle.accepted:
@@ -250,19 +254,20 @@ class WaLINode(Node):
 
     self.get_logger().info('rotate Goal Accepted :)')
 
-    self._get_rotate_result_future = goal_handle.get_result_async()
-    self._get_rotate_result_future.add_done_callback(self.get_rotate_result_callback)
+    self._get_rotate_angle_result_future = goal_handle.get_result_async()
+    self._get_rotate_angle_result_future.add_done_callback(self.get_rotate_angle_result_callback)
 
-  def get_rotate_result_callback(self, future):
+  def get_rotate_angle_result_callback(self, future):
     result = future.result().result
     if DEBUG:
-      printMsg = "get_rotate_result_callback(): rotate Result is_rotateed {} %".format(result.is_rotateed)
+      printMsg = "get_rotate_angle_result_callback(): rotate Result {} %".format(result)
       print(printMsg)
-    if result.is_rotateed:
-      self.state = "rotateed"
-    else:
-      self.state = "unrotateed"
-    self.get_logger().info('Result.is_rotateed: {0}'.format(result.is_rotateed))
+    # if result.is_rotateed:
+    #    self.state = "ready2dock"
+    # else:
+    #  # do not change WaLI state
+    #  pass
+    self.get_logger().info('Result: {0}'.format(result))
 
 
 
@@ -280,16 +285,23 @@ class WaLINode(Node):
       # publishes /rotate_angle {angle: 1.57} (180deg) when BatteryState.percentage < 30%
       # publishes /dock action goal when BatteryState.percentage < 0.25
 
-      if (self.battery_percentage > 0.95) and (self.state not in ["undocking","undocked"]):
+      if (self.battery_percentage > 0.95) and (self.state in ["docked","init"]):
         self.state = "undocking"
         if DEBUG:
           printMsg = "wali_main_cb(): battery_percentage {:.0} % sending undock action goal".format(self.battery_percentage)
         self.undock_action_send_goal()
 
-      elif (self.battery_percentage < 0.35) and (self.state not in ["docking","docked"]):
+      elif (self.battery_percentage < 0.90) and (self.state in ["undocked","init"]):
+        self.state = "turning"
+        if DEBUG:
+          printMsg = "wali_main_cb(): battery_percentage {:.0} % sending rotate180 action goal".format(self.battery_percentage)
+        self.rotate_angle_action_send_goal(angle=math.pi)    # pi=180 deg
+        self.state = "ready2dock"
+
+      elif (self.battery_percentage < 0.85) and (self.state in ["ready2dock"]):
         self.state = "docking"
         if DEBUG:
-          printMsg = "wali_main_cb(): battery_percentage {:.0} % sending dock action goal".format(self.battery_percentage)
+          printMsg = "wali_main_cb(): battery_percentage {:.0} % sending rotate180 action goal".format(self.battery_percentage)
         self.dock_action_send_goal()
 
     except Exception as e:
