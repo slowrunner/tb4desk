@@ -44,7 +44,30 @@
       ---
       # Feedback
 
+    - irobot_create_msgs/action/Dock
+      # Request
+      ---
+      # Result
+      bool is_docked
+      ---
+      # Feedback
+      bool sees_dock
 
+    - irobot_create_msgs/action/RotateAngle
+      # Request
+
+      # Rotate for relative angle (radians) from current robot position.  Angles greater than 2 PI will cause the robot to rotate in multiple circles
+      float32 angle
+      # Max rotation speed (positive rad/s), will cap negative angle to negative speed
+      float32 max_rotation_speed 1.9
+      ---
+      # Result
+      # Pose where robot finished
+      geometry_msgs/PoseStamped pose
+      ---
+      # Feedback
+      # Remaining radians to rotate
+      float32 remaining_angle_travel
 
 """
 
@@ -59,6 +82,8 @@ from rclpy.time import Time
 from sensor_msgs.msg import BatteryState       # percentage: 0.0 - 1.0
 from irobot_create_msgs.action import Undock      # no parms, result: is_docked: true,false
 from irobot_create_msgs.msg import DockStatus  # docked: true,false
+from irobot_create_msgs.action import Dock      # no parms, result: is_docked: true,false, Feedback: sees_dock: true,false
+from irobot_create_msgs.action import RotateAngle  # angle: float32, max_rotation_speed: float32 (1.9r/s), result: pose, Feedback: remaining_angle_travel: float32
 
 import sys
 import logging
@@ -150,11 +175,96 @@ class WaLINode(Node):
     if DEBUG:
       printMsg = "get_undock_result_callback(): Undock Result is_docked {} %".format(result.is_docked)
       print(printMsg)
+
     if result.is_docked:
       self.state = "docked"
+      printMsg = "** WaLI Undocking: failed **"
+      self.get_logger().info(printMsg)
     else:
       self.state = "undocked"
-    self.get_logger().info('Result.is_docked: {0}'.format(result.is_docked))
+      printMsg = "** WaLI Undocking: success **"
+      self.get_logger().info(printMsg)
+
+
+
+
+  def dock_action_send_goal(self):
+    dock_msg = dock.Goal()
+    if DEBUG:
+      printMsg = "dock_action_send_goal(): executing"
+      print(printMsg)
+    self._dock_action_client.wait_for_server()
+    self._dock_action_send_goal_future = self._dock_action_client.send_goal_async(dock_msg)
+    self._dock_action_send_goal_future.add_done_callback(self.dock_goal_response_callback)
+
+  def dock_goal_response_callback(self, future):
+    goal_handle = future.result()
+    if DEBUG:
+      printMsg = "dock_goal_response_callback(): Goal Accepted: {}".format(goal_handle.accepted)
+      print(printMsg)
+
+    if not goal_handle.accepted:
+      self.get_logger().info('dock Goal Rejected :(')
+      return
+
+    self.get_logger().info('dock Goal Accepted :)')
+
+    self._get_dock_result_future = goal_handle.get_result_async()
+    self._get_dock_result_future.add_done_callback(self.get_dock_result_callback)
+
+  def get_dock_result_callback(self, future):
+    result = future.result().result
+    if DEBUG:
+      printMsg = "get_dock_result_callback(): dock Result is_docked {} %".format(result.is_docked)
+      print(printMsg)
+    if result.is_docked:
+      self.state = "docked"
+      printMsg = "** WaLi Docking: success **"
+      self.get_logger().info(printMsg)
+    else:
+      self.state = "undocked"
+      printMsg = "** WaLi Docking: failed **"
+      self.get_logger().info(printMsg)
+
+
+
+
+  def rotate_action_send_goal(self):
+    rotate_msg = rotate.Goal()
+    if DEBUG:
+      printMsg = "rotate_action_send_goal(): executing"
+      print(printMsg)
+    self._rotate_action_client.wait_for_server()
+    self._rotate_action_send_goal_future = self._rotate_action_client.send_goal_async(rotate_msg)
+    self._rotate_action_send_goal_future.add_done_callback(self.rotate_goal_response_callback)
+
+  def rotate_goal_response_callback(self, future):
+    goal_handle = future.result()
+    if DEBUG:
+      printMsg = "rotate_goal_response_callback(): Goal Accepted: {}".format(goal_handle.accepted)
+      print(printMsg)
+
+    if not goal_handle.accepted:
+      self.get_logger().info('rotate Goal Rejected :(')
+      return
+
+    self.get_logger().info('rotate Goal Accepted :)')
+
+    self._get_rotate_result_future = goal_handle.get_result_async()
+    self._get_rotate_result_future.add_done_callback(self.get_rotate_result_callback)
+
+  def get_rotate_result_callback(self, future):
+    result = future.result().result
+    if DEBUG:
+      printMsg = "get_rotate_result_callback(): rotate Result is_rotateed {} %".format(result.is_rotateed)
+      print(printMsg)
+    if result.is_rotateed:
+      self.state = "rotateed"
+    else:
+      self.state = "unrotateed"
+    self.get_logger().info('Result.is_rotateed: {0}'.format(result.is_rotateed))
+
+
 
 
   def wali_main_cb(self):
@@ -170,12 +280,18 @@ class WaLINode(Node):
       # publishes /rotate_angle {angle: 1.57} (180deg) when BatteryState.percentage < 30%
       # publishes /dock action goal when BatteryState.percentage < 0.25
 
-      # if (self.battery_percentage == 1.0):
-      if (self.battery_percentage > 0.5) and (self.state not in ["undocking","undocked"]):    # for testing
+      if (self.battery_percentage > 0.95) and (self.state not in ["undocking","undocked"]):
         self.state = "undocking"
         if DEBUG:
           printMsg = "wali_main_cb(): battery_percentage {:.0} % sending undock action goal".format(self.battery_percentage)
         self.undock_action_send_goal()
+
+      elif (self.battery_percentage < 0.35) and (self.state not in ["docking","docked"]):
+        self.state = "docking"
+        if DEBUG:
+          printMsg = "wali_main_cb(): battery_percentage {:.0} % sending dock action goal".format(self.battery_percentage)
+        self.dock_action_send_goal()
+
     except Exception as e:
         print("wali_main_cb(): Exception:",str(e))
         sys.exit(1)

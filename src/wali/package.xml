@@ -4,7 +4,7 @@
   <name>wali</name>
   <version>0.0.0</version>
   <description>WaLI: Wall follower Looking for Intelligence</description>
-  <maintainer email="slowrunner@users.noreply.github.com">ubuntu</maintainer>
+  <maintainer email="slowrunner@users.noreply.github.com">slowrunner</maintainer>
   <license>TODO: License declaration</license>
 
   <exec_depend>rclpy</exec_depend>
