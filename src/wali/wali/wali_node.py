@@ -186,7 +186,7 @@ class WaLINode(Node):
 
     else:
       self.state = "undocked"
-      printMsg = "** WaLI Undocking: success **"
+      printMsg = "** WaLI Undocking: success at battery {:.0f}% **".format(self.battery_percentage*100)
       self.lifeLog.info(printMsg)
 
 
@@ -228,7 +228,7 @@ class WaLINode(Node):
       print(printMsg)
     if result.is_docked:
       self.state = "docked"
-      printMsg = "** WaLi Docking: success **"
+      printMsg = "** WaLi Docking: success at battery {:.0f}% **".format(self.battery_percentage*100)
       self.lifeLog.info(printMsg)
 
     else:
