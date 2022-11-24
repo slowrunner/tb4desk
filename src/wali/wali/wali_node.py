@@ -78,10 +78,9 @@ from rclpy.executors import ExternalShutdownException
 from rclpy.qos import qos_profile_sensor_data
 from rclpy.action import ActionClient
 from rclpy.time import Time
-
 from sensor_msgs.msg import BatteryState       # percentage: 0.0 - 1.0
 from irobot_create_msgs.action import Undock      # no parms, result: is_docked: true,false
-from irobot_create_msgs.msg import DockStatus  # docked: true,false
+# from irobot_create_msgs.msg import DockStatus  # docked: true,false
 from irobot_create_msgs.action import DockServo
 from irobot_create_msgs.action import RotateAngle  # angle: float32, max_rotation_speed: float32 (1.9r/s), result: pose, Feedback: remaining_angle_travel: float32
 
@@ -108,7 +107,7 @@ class WaLINode(Node):
     self.loghandler.setFormatter(self.logformatter)
     self.lifeLog.addHandler(self.loghandler)
 
-    printMsg = 'WaLI node started'
+    printMsg = '** WaLI node started **'
     print(printMsg)
     self.lifeLog.info(printMsg)
 

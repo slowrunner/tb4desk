@@ -2,13 +2,20 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>wali</name>
-  <version>0.0.0</version>
+  <version>0.0.1</version>
   <description>WaLI: Wall follower Looking for Intelligence</description>
   <maintainer email="slowrunner@users.noreply.github.com">slowrunner</maintainer>
   <license>TODO: License declaration</license>
 
+<!-- REF: https://turtlebot.github.io/turtlebot4-user-manual/tutorials/first_node_python.html -->
+  <depend>rclpy</depend>
+  <depend>irobot_create_msgs</depend>
+
+<!--
   <exec_depend>rclpy</exec_depend>
-  <exec_depend>irobot_create_msgs</exec_depend>
+  <exec_depend>irobot_create_msgs</exec_depend> 
+-->
+
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>std_msgs</exec_depend>
 
