@@ -44,7 +44,7 @@
       ---
       # Feedback
 
-    - irobot_create_msgs/action/Dock
+    - irobot_create_msgs/action/DockServo
       # Request
       ---
       # Result
@@ -82,7 +82,7 @@ from rclpy.time import Time
 from sensor_msgs.msg import BatteryState       # percentage: 0.0 - 1.0
 from irobot_create_msgs.action import Undock      # no parms, result: is_docked: true,false
 from irobot_create_msgs.msg import DockStatus  # docked: true,false
-from irobot_create_msgs.action import Dock      # no parms, result: is_docked: true,false, Feedback: sees_dock: true,false
+from irobot_create_msgs.action import DockServo
 from irobot_create_msgs.action import RotateAngle  # angle: float32, max_rotation_speed: float32 (1.9r/s), result: pose, Feedback: remaining_angle_travel: float32
 
 import sys
@@ -128,16 +128,17 @@ class WaLINode(Node):
     self.battery_state = None
 
     self._undock_action_client = ActionClient(self, Undock, 'undock')
-    self._dock_action_client = ActionClient(self, Dock, 'dock')
+    self._dock_action_client = ActionClient(self, DockServo, 'dock')  # the "dock" action server requires a DockServo.action msg
     self._rotate_angle_action_client = ActionClient(self, RotateAngle, 'rotate_angle')
 
     period_for_timer = 60.0  # Once every 60 seconds
     self.timer = self.create_timer( period_for_timer, self.wali_main_cb)  # call the wali_node's main loop when ROS timer triggers
-    if DEBUG: 
+    if DEBUG:
         printMsg ='wali_node: created wali_main callback for once every {:.0f} seconds'.format(period_for_timer)
         print(printMsg)
     self.battery_percentage = -1
     self.state = "init"
+    # self.state = "ready2dock"   # for testing docking
 
 
   def battery_state_sub_callback(self,battery_state_msg):
@@ -181,23 +182,28 @@ class WaLINode(Node):
     if result.is_docked:
       self.state = "docked"
       printMsg = "** WaLI Undocking: failed **"
-      self.get_logger().info(printMsg)
+      self.lifeLog.info(printMsg)
+
     else:
       self.state = "undocked"
       printMsg = "** WaLI Undocking: success **"
-      self.get_logger().info(printMsg)
+      self.lifeLog.info(printMsg)
+
 
 
 
 
   def dock_action_send_goal(self):
-    dock_msg = Dock.Goal()
+    dock_msg = DockServo.Goal()
     if DEBUG:
       printMsg = "dock_action_send_goal(): executing"
       print(printMsg)
     self._dock_action_client.wait_for_server()
+    if DEBUG: print("dock_action_send_goal(): after wait_for_server()")
     self._dock_action_send_goal_future = self._dock_action_client.send_goal_async(dock_msg)
+    if DEBUG: print("dock_action_send_goal(): after set future")
     self._dock_action_send_goal_future.add_done_callback(self.dock_goal_response_callback)
+    if DEBUG: print("dock_action_send_goal(): after add_done_callback")
 
   def dock_goal_response_callback(self, future):
     goal_handle = future.result()
@@ -210,6 +216,7 @@ class WaLINode(Node):
       return
 
     self.get_logger().info('dock Goal Accepted :)')
+    self.state = "docking"
 
     self._get_dock_result_future = goal_handle.get_result_async()
     self._get_dock_result_future.add_done_callback(self.get_dock_result_callback)
@@ -222,11 +229,12 @@ class WaLINode(Node):
     if result.is_docked:
       self.state = "docked"
       printMsg = "** WaLi Docking: success **"
-      self.get_logger().info(printMsg)
+      self.lifeLog.info(printMsg)
+
     else:
       self.state = "undocked"
       printMsg = "** WaLi Docking: failed **"
-      self.get_logger().info(printMsg)
+      self.lifeLog.info(printMsg)
 
 
 
@@ -267,7 +275,7 @@ class WaLINode(Node):
     # else:
     #  # do not change WaLI state
     #  pass
-    self.get_logger().info('Result: {0}'.format(result))
+    # self.get_logger().info('Result: {0}'.format(result))
 
 
 
@@ -291,17 +299,17 @@ class WaLINode(Node):
           printMsg = "wali_main_cb(): battery_percentage {:.0} % sending undock action goal".format(self.battery_percentage)
         self.undock_action_send_goal()
 
-      elif (self.battery_percentage < 0.90) and (self.state in ["undocked","init"]):
+      elif (self.battery_percentage < 0.30) and (self.state in ["undocked","init"]):
         self.state = "turning"
         if DEBUG:
           printMsg = "wali_main_cb(): battery_percentage {:.0} % sending rotate180 action goal".format(self.battery_percentage)
         self.rotate_angle_action_send_goal(angle=math.pi)    # pi=180 deg
         self.state = "ready2dock"
 
-      elif (self.battery_percentage < 0.85) and (self.state in ["ready2dock"]):
+      elif (self.battery_percentage < 0.25) and (self.state in ["ready2dock"]):
         self.state = "docking"
         if DEBUG:
-          printMsg = "wali_main_cb(): battery_percentage {:.0} % sending rotate180 action goal".format(self.battery_percentage)
+          printMsg = "wali_main_cb(): battery_percentage {:.0} % sending dock action goal".format(self.battery_percentage)
         self.dock_action_send_goal()
 
     except Exception as e:
