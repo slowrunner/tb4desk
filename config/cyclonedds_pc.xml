@@ -2,7 +2,7 @@
     <Domain>
         <General>
             <DontRoute>true</DontRoute>
-            <NetworkInterfaceAddress>10.0.0.53</NetworkInterfaceAddress>
+            <NetworkInterfaceAddress>10.0.0.XX</NetworkInterfaceAddress>
         </General>
     </Domain>
 </CycloneDDS>
