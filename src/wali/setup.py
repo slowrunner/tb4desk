@@ -20,7 +20,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'wali_node = wali.wali_node:main'
+            'wali_node = wali.wali_node:main',
+            'battery_sub = wali.battery_sub:main'
         ],
     },
 )
