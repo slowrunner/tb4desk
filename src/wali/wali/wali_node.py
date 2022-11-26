@@ -91,6 +91,10 @@ import datetime as dt
 DEBUG = False
 LIFELOGFILE = "/home/ubuntu/tb4rpi/life.log"
 
+UNDOCK_AT_PERCENTAGE = 0.995
+ROTATE_AT_PERCENTAGE = 0.275
+DOCK_AT_PERCENTAGE   = 0.250
+
 # Uncomment for debug prints to console
 DEBUG = True
 
@@ -292,20 +296,20 @@ class WaLINode(Node):
       # publishes /rotate_angle {angle: 1.57} (180deg) when BatteryState.percentage < 30%
       # publishes /dock action goal when BatteryState.percentage < 0.25
 
-      if (self.battery_percentage > 0.95) and (self.state in ["docked","init"]):
+      if (self.battery_percentage > UNDOCK_AT_PERCENTAGE) and (self.state in ["docked","init"]):
         self.state = "undocking"
         if DEBUG:
           printMsg = "wali_main_cb(): battery_percentage {:.0} % sending undock action goal".format(self.battery_percentage)
         self.undock_action_send_goal()
 
-      elif (self.battery_percentage < 0.30) and (self.state in ["undocked","init"]):
+      elif (self.battery_percentage < ROTATE_AT_PERCENTAGE) and (self.state in ["undocked","init"]):
         self.state = "turning"
         if DEBUG:
           printMsg = "wali_main_cb(): battery_percentage {:.0} % sending rotate180 action goal".format(self.battery_percentage)
         self.rotate_angle_action_send_goal(angle=math.pi)    # pi=180 deg
         self.state = "ready2dock"
 
-      elif (self.battery_percentage < 0.25) and (self.state in ["ready2dock"]):
+      elif (self.battery_percentage < DOCK_AT_PERCENTAGE) and (self.state in ["ready2dock"]):
         self.state = "docking"
         if DEBUG:
           printMsg = "wali_main_cb(): battery_percentage {:.0} % sending dock action goal".format(self.battery_percentage)
