@@ -139,7 +139,7 @@ class WaLINode(Node):
     if DEBUG:
         printMsg ='wali_node: created wali_main callback for once every {:.0f} seconds'.format(period_for_timer)
         print(printMsg)
-    self.battery_percentage = -1
+    self.battery_percentage = -1.0
     self.state = "init"
     # self.state = "ready2dock"   # for testing docking
 
