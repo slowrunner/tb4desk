@@ -51,7 +51,7 @@ class BatterySub(Node):
     super().__init__('battery_sub')
 
 
-    printMsg = '** WaLI node started **'
+    printMsg = '** Battery_Sub node started **'
     print(printMsg)
 
 
